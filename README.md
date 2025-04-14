@@ -126,3 +126,36 @@ pip install -r requirements.txt
 ```
 python ./script.py
 ```
+
+## Telegram bot интеграция
+
+2. 🤖 Create Telegram Bot & Channel
+Search in Telegram: @BotFather
+
+Send: /newbot and follow instructions
+
+Save the bot token it gives you (e.g., 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)
+
+Create a new Telegram channel
+
+Add your bot as an admin of that channel (for sending messages only)
+
+Send any test message to the channel from your personal Telegram account
+
+Get the channel ID:
+
+Visit this URL (replacing BOT_TOKEN):
+https://api.telegram.org/bot<BOT_TOKEN>/getUpdates
+
+You'll see something like:
+
+json
+Copy
+Edit
+"chat": {
+  "id": -1001234567890,
+  "title": "YourChannel",
+  "type": "channel"
+}
+Save the chat.id (e.g., -1001234567890)
+
