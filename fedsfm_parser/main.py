@@ -109,13 +109,12 @@ def parse_person_text(text: str):
         return ["Ошибка", "", "", "", "", ""]
 
 def clean_old_files(folder_path, keep_latest=10):
-    pass
-    # files = sorted(glob.glob(os.path.join(folder_path, "*")), key=os.path.getmtime, reverse=True)
-    # for old_file in files[keep_latest:]:
-    #     try:
-    #         os.remove(old_file)
-    #     except Exception as e:
-    #         logging.warning(f"Не удалось удалить {old_file}: {e}")
+    files = sorted(glob.glob(os.path.join(folder_path, "*")), key=os.path.getmtime, reverse=True)
+    for old_file in files[keep_latest:]:
+        try:
+            os.remove(old_file)
+        except Exception as e:
+            logging.warning(f"Не удалось удалить {old_file}: {e}")
 
 def compare_with_previous(old_df, new_df):
     old_ids = set(old_df['ID'])
@@ -283,14 +282,15 @@ def parse_data():
                 if index < 100:
                     send_telegram_message(msg)
 
-            report_filename = os.path.splitext(data_filename)[0] + "_report.txt"
-            report_file = os.path.join(DATA_FOLDER, report_filename)
-            with open(report_file, "w", encoding="utf-8") as f:
-                report = "\n----------\n".join(report)
-                f.write(report)
+            if report:
+                report_filename = os.path.splitext(data_filename)[0] + "_report.txt"
+                report_file = os.path.join(DATA_FOLDER, report_filename)
+                with open(report_file, "w", encoding="utf-8") as f:
+                    report = "\n----------\n".join(report)
+                    f.write(report)
 
-            if report_file:
-                send_telegram_file(report_file)
+                if report_file:
+                    send_telegram_file(report_file)
 
         else:
             logging.info("Первый запуск. Нет данных для сравнения.")
