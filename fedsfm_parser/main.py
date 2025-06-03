@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from tg_bot import send_telegram_message, send_telegram_file
 
-from consts import LOGS_FOLDER, DATA_FOLDER, PARSE_URL, LOGS_LEVEL, KEEP_FILES_COUNT
+from consts import LOGS_FOLDER, DATA_FOLDER, PARSE_URL, LOGS_LEVEL, KEEP_FILES_COUNT, AIRTABLE_FOLDER
 
 def clean_field(value: str) -> str:
     if not isinstance(value, str):
@@ -176,11 +176,17 @@ def compare_with_previous(old_df, new_df):
     # return report, added_ids, removed_ids, changed_ids
 
 def parse_data():
+    log_path = setup_logger()
+    logging.info("=== Запуск парсера данных РФМ ===")
+    logging.info(f"Лог сохраняется в: {log_path}")
+
     os.makedirs(DATA_FOLDER, exist_ok=True)
     os.makedirs(LOGS_FOLDER, exist_ok=True)
+    os.makedirs(AIRTABLE_FOLDER, exist_ok=True)
 
     clean_old_files(DATA_FOLDER, KEEP_FILES_COUNT)
     clean_old_files(LOGS_FOLDER, KEEP_FILES_COUNT)
+    clean_old_files(AIRTABLE_FOLDER, KEEP_FILES_COUNT)
 
     data_filename = datetime.now().strftime("data_%Y_%m_%d__%H_%M_%S.csv")
     data_filepath = os.path.join(DATA_FOLDER, data_filename)
@@ -304,13 +310,11 @@ def parse_data():
         logging.error("Произошла ошибка:", exc_info=True)
         send_telegram_message(f"❌ Ошибка при парсинге данных: {str(e)}")
 
+    logging.info("=== Завершение работы ===")
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Парсер реестра РФМ (fedsfm.ru)")
     args = parser.parse_args()
 
-    log_path = setup_logger()
-    logging.info("=== Запуск парсера данных РФМ ===")
-    logging.info(f"Лог сохраняется в: {log_path}")
     parse_data()
-    logging.info("=== Завершение работы ===")

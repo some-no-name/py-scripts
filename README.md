@@ -159,3 +159,238 @@ Edit
 }
 Save the chat.id (e.g., -1001234567890)
 
+
+----------
+
+# Daemon run
+
+Great! Based on your setup, we’ll adjust the **`systemd` service** to:
+
+* Use your **Python virtual environment** (`myenv`)
+* Run your script located in: `/home/ec2-user/fedsfm_parser`
+* Activate the environment before running `bot_server.py`
+
+---
+
+### ✅ Step-by-Step Adjusted Configuration
+
+---
+
+### **1. Create `systemd` service file**
+
+```bash
+sudo nano /etc/systemd/system/telegrambot.service
+```
+
+---
+
+### **2. Paste the following config**:
+
+```ini
+[Unit]
+Description=Telegram Bot Service
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user/fedsfm_parser
+ExecStart=/home/ec2-user/fedsfm_parser/myenv/bin/python bot_server.py
+Restart=always
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+```
+
+✅ This:
+
+* Uses the Python from your virtual environment (`myenv/bin/python`)
+* Starts the bot script directly
+* Restarts the bot on crash
+* Ensures logs are flushed (with `PYTHONUNBUFFERED=1`)
+
+---
+
+### **3. Reload and start the service**
+
+```bash
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable telegrambot
+sudo systemctl start telegrambot
+```
+
+#### Stop
+
+```bash
+sudo systemctl stop telegrambot
+```
+
+---
+
+### **4. Check if it works**
+
+```bash
+sudo systemctl status telegrambot
+```
+
+If something fails:
+
+```bash
+journalctl -u telegrambot -n 50 --no-pager
+```
+
+---
+
+### ✅ Optional: View live logs
+
+```bash
+journalctl -u telegrambot -f
+```
+
+---
+
+This setup makes your Telegram bot:
+
+* Always running
+* Auto-starting on reboot
+* Using your virtualenv
+* Isolated and production-friendly
+
+Let me know if you want to log output to a file or use `tmux` during development.
+
+
+
+-----------
+
+To run your `main.py` script **every 2 hours from 8:00 to 20:00 Moscow time (Mon–Fri)** — regardless of your server's actual timezone — the best approach is to use **`systemd` + `systemd timer`**, paired with **`systemd-timezone-aware logic in Python`** or by explicitly setting the timezone for scheduling.
+
+---
+
+### ✅ Here's what you need to do:
+
+---
+
+## ⚙️ 1. **Set up a `systemd` service for `main.py`**
+
+Create a service to run `main.py` **on demand** (not a daemon, just one-shot):
+
+```bash
+sudo nano /etc/systemd/system/runmain.service
+```
+
+```ini
+[Unit]
+Description=Run main.py one-shot task
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user/fedsfm_parser
+ExecStart=/home/ec2-user/fedsfm_parser/myenv/bin/python main.py
+Environment=PYTHONUNBUFFERED=1
+```
+
+> ✅ This only runs `main.py` when triggered by a timer.
+
+---
+
+## 🕒 2. **Create a `systemd timer`**
+
+Create the timer that runs the service every 2 hours from **8:00 to 20:00** on **Monday to Friday**:
+
+```bash
+sudo nano /etc/systemd/system/runmain.timer
+```
+
+```ini
+[Unit]
+Description=Run main.py every 2 hours from 8:00 to 20:00 MSK (Mon–Fri)
+
+[Timer]
+OnCalendar=Mon..Fri 08:00
+OnCalendar=Mon..Fri 10:00
+OnCalendar=Mon..Fri 12:00
+OnCalendar=Mon..Fri 14:00
+OnCalendar=Mon..Fri 16:00
+OnCalendar=Mon..Fri 18:00
+OnCalendar=Mon..Fri 20:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+> 🔁 `Persistent=true` ensures missed runs (e.g., after reboot) are triggered on boot.
+
+---
+
+## 🌍 3. **Ensure the schedule runs in Moscow time**
+
+A `systemd` timer always uses **server’s local time**, so:
+
+* Either change your server timezone to **Moscow time**:
+
+```bash
+sudo timedatectl set-timezone Europe/Moscow
+```
+
+* **Or keep the server’s timezone unchanged** and handle the logic inside `main.py`:
+
+```python
+# Inside main.py
+from datetime import datetime
+import pytz
+
+moscow = pytz.timezone("Europe/Moscow")
+now = datetime.now(moscow)
+
+if not (8 <= now.hour <= 20 and now.weekday() < 5):
+    print("Not within allowed Moscow time window. Exiting.")
+    exit()
+```
+
+This ensures the script only runs during your required window regardless of server time.
+
+---
+
+## ✅ 4. **Enable and start the timer**
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable runmain.timer
+sudo systemctl start runmain.timer
+```
+
+You can check timer status with:
+
+```bash
+systemctl list-timers --all
+```
+
+---
+
+## 🧪 5. (Optional) Test your setup
+
+To simulate a manual run:
+
+```bash
+sudo systemctl start runmain.service
+```
+
+To check logs:
+
+```bash
+journalctl -u runmain.service --no-pager
+```
+
+---
+
+### ✅ Summary
+
+| Task                           | Done by                                      |
+| ------------------------------ | -------------------------------------------- |
+| Run every 2h from 8–20 Mon–Fri | `systemd.timer`                              |
+| Run `main.py` on-demand        | `runmain.service`                            |
+| Ensure Moscow hours            | Either via `timedatectl` or inside `main.py` |
+
+Let me know if you'd like it to log to a file instead of system journal or if you want to get Telegram notifications on success/failure!
