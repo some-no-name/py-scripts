@@ -5,6 +5,9 @@ __pycache__/
 python-script-key.pem
 
 data/
+logs/
+reports/
+airtable_cache/
 .DS_Store
 
 # C extensions

@@ -1,0 +1,8 @@
+beautifulsoup4
+pandas
+requests
+python-telegram-bot==13.15
+rapidfuzz
+urllib3<2
+jinja2
+standard-imghdr
