@@ -9,6 +9,7 @@ MAX_TRIES = 7
 
 def send_telegram_message(message: str):
     try:
+        logging.debug(f"Send message: {message}")
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID:
             logging.debug("Creating tg bot...")
             bot = Bot(token=TELEGRAM_BOT_TOKEN)

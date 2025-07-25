@@ -1,4 +1,5 @@
 consts.py
 logs/
 data/
+data_copy/
 .DS_Store

@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from tg_bot import send_telegram_message, send_telegram_file
 
-from consts import LOGS_FOLDER, DATA_FOLDER, PARSE_URL, LOGS_LEVEL, KEEP_FILES_COUNT, AIRTABLE_FOLDER
+from consts import LOGS_FOLDER, DATA_FOLDER, PARSE_URL, LOGS_LEVEL, KEEP_FILES_COUNT
 
 def clean_field(value: str) -> str:
     if not isinstance(value, str):
@@ -182,18 +182,18 @@ def parse_data():
 
     os.makedirs(DATA_FOLDER, exist_ok=True)
     os.makedirs(LOGS_FOLDER, exist_ok=True)
-    os.makedirs(AIRTABLE_FOLDER, exist_ok=True)
+    # os.makedirs(AIRTABLE_FOLDER, exist_ok=True)
 
     clean_old_files(DATA_FOLDER, KEEP_FILES_COUNT)
     clean_old_files(LOGS_FOLDER, KEEP_FILES_COUNT)
-    clean_old_files(AIRTABLE_FOLDER, KEEP_FILES_COUNT)
+    # clean_old_files(AIRTABLE_FOLDER, KEEP_FILES_COUNT)
 
     data_filename = datetime.now().strftime("data_%Y_%m_%d__%H_%M_%S.csv")
     data_filepath = os.path.join(DATA_FOLDER, data_filename)
     prev_filename = find_previous_data_file(data_filename)
 
     try:
-        send_telegram_message("🚀 Начат парсинг данных...")
+        # send_telegram_message("🚀 Начат парсинг данных...")
 
         response = requests.get(PARSE_URL, headers={"User-Agent": "Mozilla/5.0"}, verify=False)
         response.raise_for_status()
@@ -229,9 +229,8 @@ def parse_data():
         df.to_csv(data_filepath, index=False, encoding='utf-8')
         logging.info(f"Данные сохранены в {data_filepath}")
 
-        summary = f"#отчет"
-        summary += f"\n✅ Парсинг завершён. Записей найдено: {len(data)}"
-        summary += f"\nСохранено: {data_filepath}"
+        summary = f"✅ Парсинг завершён #отчет"
+        summary += f"\nСохранено: {data_filepath.split('/')[-1]} ({len(data)})"
         report_file = None
 
         if prev_filename and os.path.exists(prev_filename):
@@ -242,68 +241,54 @@ def parse_data():
 
             added_list, removed_list, changed_list = compare_with_previous(old_df, new_df)
 
-            summary += f"\n\nСравнение с: {prev_filename}; Было записей: {len(old_df)}"
-            summary += f"\n- Добавлено: {len(added_list)};{'Слишком много, отдельных постов не будет!' if len(added_list) >= 100 else ''}"
-            summary += f"\n- Удалено: {len(removed_list)};{'Слишком много, отдельных постов не будет!' if len(removed_list) >= 100 else ''}"
-            summary += f"\n- Обновлено: {len(changed_list)};{'Слишком много, отдельных постов не будет!' if len(changed_list) >= 100 else ''}"
+            summary += f"\nСравнение с: {prev_filename.split('/')[-1]} ({len(old_df)})\n"
+            summary += f"\n- Добавлено: {len(added_list)}"
+            summary += f"\n- Удалено: {len(removed_list)}"
+            summary += f"\n- Обновлено: {len(changed_list)}"
 
             send_telegram_message(summary)
-            send_telegram_file(data_filepath)
 
             report = []
 
-            index = 0
             for added_row in added_list:
-                index += 1
-                msg = "#добавлен"
+                msg = "🟢 #добавлен"
                 msg += f"\n{added_row.get('Изначальный текст') or added_row.get('Имя')}"
-
                 report.append(msg)
+                send_telegram_message(msg)
 
-                if index < 100:
-                    send_telegram_message(msg)
-
-            index = 0
             for removed_row in removed_list:
-                index += 1
-
-                msg = "#удален"
+                msg = "🔴 #удален"
                 msg += f"\n{removed_row.get('Изначальный текст') or removed_list.get('Имя')}"
-
                 report.append(msg)
-            
-                if index < 100:
-                    send_telegram_message(msg)
+                send_telegram_message(msg)
 
-            index = 0
             for old_row, new_row in changed_list:
-                index += 1
-
-                msg = "#обновлен (было/стало)"
-                msg += f"\n\n{old_row.get('Изначальный текст') or old_row.get('Имя')}"
+                msg = "🟡 #обновлен (было/стало)"
+                msg += f"\n{old_row.get('Изначальный текст') or old_row.get('Имя')}"
                 msg += f"\n\n{new_row.get('Изначальный текст') or new_row.get('Имя')}"
-    
                 report.append(msg)
-
-                if index < 100:
-                    send_telegram_message(msg)
+                send_telegram_message(msg)
 
             if report:
-                report_filename = os.path.splitext(data_filename)[0] + "_report.txt"
-                report_file = os.path.join(DATA_FOLDER, report_filename)
-                with open(report_file, "w", encoding="utf-8") as f:
-                    report = "\n----------\n".join(report)
-                    f.write(report)
+                send_telegram_file(data_filepath)
 
-                if report_file:
-                    send_telegram_file(report_file)
+
+            # if report:
+            #     report_filename = os.path.splitext(data_filename)[0] + "_report.txt"
+            #     report_file = os.path.join(DATA_FOLDER, report_filename)
+            #     with open(report_file, "w", encoding="utf-8") as f:
+            #         report = "\n----------\n".join(report)
+            #         f.write(report)
+
+            #     if report_file:
+            #         send_telegram_file(report_file)
 
         else:
             logging.info("Первый запуск. Нет данных для сравнения.")
             summary += "\n\n📂 Первый запуск. Нет данных для сравнения."
 
             send_telegram_message(summary)
-            send_telegram_file(data_filepath)
+            # send_telegram_file(data_filepath)
 
 
     except Exception as e:

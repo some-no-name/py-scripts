@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+python-script-key.pem
 
 data/
 .DS_Store
