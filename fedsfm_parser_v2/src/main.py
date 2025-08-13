@@ -111,7 +111,7 @@ def run(*, test_mode: bool = False, compare_all: bool = False) -> None:
             logging.info(f"[Notify]: {action}, {mtype}, {score}, {rfm_row}")
             if test_mode:
                 return  # не шумим
-            sym = {"add": "🟢", "del": "🔴"}[action]
+            sym = {"add": "🟢", "del": "🔴", "changed": "🟡"}[action]
             fio = rfm_row.get("Имя") or rfm_row.get("Name", "?")
             dob = rfm_row.get("Дата рождения") or rfm_row.get("✦Дата рождения", "?")
             send_message(f"{sym} {fio} ({dob}) — {action} [{mtype}, {score}];\nRFM: {str(rfm_row.get("Изначальный текст"))}")
@@ -189,6 +189,8 @@ def run(*, test_mode: bool = False, compare_all: bool = False) -> None:
 
 # ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
     parser = argparse.ArgumentParser(description="RFM parser main entry")
     parser.add_argument("--test", action="store_true", help="Test mode (quiet)")
     parser.add_argument("--all",  action="store_true",
