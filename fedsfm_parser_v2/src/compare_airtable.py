@@ -5,6 +5,7 @@ import logging, re, unicodedata, pandas as pd
 from rapidfuzz import fuzz, process
 from typing import Literal, Tuple, List, Dict
 
+from notify_tools import is_terrorist, notify
 from storage import get_region_dict
 
 MatchType = Literal["full", "partial", "none"]
@@ -36,20 +37,6 @@ def _norm(text: str) -> str:
     text = re.sub(r"[^\w\s]", " ", text, flags=re.U)
     text = re.sub(r"\s+", " ", text).strip().upper()
     return text
-
-
-def _is_terrorist(row: dict) -> List[str]:
-    fio = []
-    for fld in ["Террорист", "✦Росфинмониторинг"]:
-        val = row.get(fld, None)
-        if val != None and isinstance(val, str):
-            logging.info(f"return1 {val == 'True'}")
-            return val == 'True'
-        if val != None and isinstance(val, bool):
-            logging.info(f"return2 {val}")
-            return val
-
-    return False
 
 
 def _fio_tokens(row: dict) -> List[str]:
@@ -213,6 +200,7 @@ def compare_all_mapped(df_new, airtable_df, report):
 
     # For each row in df_new, only compare to similar name keys
     for _, rfm_row in df_new.iterrows():
+        index += 1
         rfm_row_dict = rfm_row.to_dict()
         candidates = []
         keys = name_keys(rfm_row_dict)
@@ -234,16 +222,7 @@ def compare_all_mapped(df_new, airtable_df, report):
 
         terr_match = ""
         if best_type != "none" and best_row:
-            rfm_terr = _is_terrorist(rfm_row)
-            air_terr = _is_terrorist(best_row)
-            terr_match = f"[{"T" if rfm_terr else "F"}{"T" if air_terr else "F"}]"
-
-            msg = f"#мэтч (сравнение всех) {terr_match}"
-            msg += f"\n{rfm_row.get('Изначальный текст') or rfm_row.get('Имя')}"
-            msg += f"\n\n{best_row}"
-            report.append(msg)
-
-            matches_all.append({**rfm_row, **best_row})
+            notify("match_all", rfm_row, best_type, best_score, best_row, report)
         
         logging.info(f"Best match all ({index}/{len(df_new)}) {terr_match}: {best_type}({best_score})\nRFM: {rfm_row.get("Изначальный текст")}\nAIR: {best_row}")
         
@@ -259,8 +238,8 @@ def compare_all_slow(df_new, airtable_df, report):
         mtype, mrow, score = find_best_match(rfm_row, airtable_df)
         logging.info(f"Best match all ({index}/{len(df_new)}): {mtype}({score})\nRFM: {rfm_row.get("Изначальный текст")}\nAIR: {mrow}")
         if mtype != "none" and mrow:
-            rfm_terr = _is_terrorist(rfm_row)
-            air_terr = _is_terrorist(mrow)
+            rfm_terr = is_terrorist(rfm_row)
+            air_terr = is_terrorist(mrow)
 
             msg = f"#мэтч (сравнение всех) [{"T" if rfm_terr else "F"}{"T" if air_terr else "F"}]"
             msg += f"\n{rfm_row.get('Изначальный текст') or rfm_row.get('Имя')}"

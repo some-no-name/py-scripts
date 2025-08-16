@@ -17,6 +17,7 @@ from typing import List, Dict
 
 import pandas as pd
 
+from notify_tools import notify
 from logger_utils import setup_logger
 from rfm_parser import fetch_rfm_list
 from storage import save_dataset, load_latest, save_report, update_master
@@ -106,41 +107,28 @@ def run(*, test_mode: bool = False, compare_all: bool = False) -> None:
 
         report.append(f"Airtable file: {get_file_name(airtable_file)}; {len(airtable_df)} записей")
 
-        # 4. ── Сравнение added/removed с Airtable (уведомления) ─────────────
-        def _notify(action: str, rfm_row: Dict, mtype: MatchType, score: int):
-            logging.info(f"[Notify]: {action}, {mtype}, {score}, {rfm_row}")
-            if test_mode:
-                return  # не шумим
-            sym = {"add": "🟢", "del": "🔴", "changed": "🟡"}[action]
-            fio = rfm_row.get("Имя") or rfm_row.get("Name", "?")
-            dob = rfm_row.get("Дата рождения") or rfm_row.get("✦Дата рождения", "?")
-            send_message(f"{sym} {fio} ({dob}) — {action} [{mtype}, {score}];\nRFM: {str(rfm_row.get("Изначальный текст"))}")
+        # 4. ── Сравнение added/removed с Airtable (уведомления) ─────────────        
+        if not compare_all:
+            def _find_match(row, mode: str, index: int, count: int):
+                mtype, mrow, score = find_best_match(row, airtable_df)
+                logging.info(f"Best match {mode} ({index}/{count}): {mtype}({score})\nRFM: {row.get("Изначальный текст")}\nAIR: {mrow}")
+                if mtype != "none":
+                    notify(mode, row, mtype, score, mrow, report)
 
-        index = 0
-        for row in added_rfm:
-            index += 1
-            mtype, mrow, score = find_best_match(row, airtable_df)
-            logging.info(f"Best match added ({index}/{len(added_rfm)}): {mtype}({score})\nRFM: {row.get("Изначальный текст")}\nAIR: {mrow}")
-            if mtype != "none":
-                msg = "#мэтч (добавлен в рфм)"
-                msg += f"\n{row.get('Изначальный текст') or row.get('Имя')}"
-                msg += f"\n\n{mrow}"
-                report.append(msg)
+            index = 0
+            for row in added_rfm:
+                index += 1
+                _find_match(row, "add", index, len(added_rfm))
 
-                _notify("add", row, mtype, score)
+            index = 0
+            for row in removed_rfm:
+                index += 1
+                _find_match(row, "del", index, len(removed_rfm))
 
-        index = 0
-        for row in removed_rfm:
-            index += 1
-            mtype, mrow, score = find_best_match(row, airtable_df)
-            logging.info(f"Best match removed ({index}/{len(removed_rfm)}): {mtype}({score})\nRFM: {row.get("Изначальный текст")}\nAIR: {mrow}")
-            if mtype != "none":
-                msg = "#мэтч (удален из рфм)"
-                msg += f"\n{row.get('Изначальный текст') or row.get('Имя')}"
-                msg += f"\n\n{mrow}"
-                report.append(msg)
+            index = 0
+            for old_row, row in changed_rfm:
+                _find_match(row, "changed", index, len(changed_rfm))
 
-                _notify("del", row, mtype, score) # TODO: maybe the message should contain rfm field and a airtable for fast match
 
         # 5. ── Полное сравнение (если compare_all=True) ──────────────────────
         index = 0
@@ -189,7 +177,7 @@ def run(*, test_mode: bool = False, compare_all: bool = False) -> None:
 
 # ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser(description="RFM parser main entry")
     parser.add_argument("--test", action="store_true", help="Test mode (quiet)")

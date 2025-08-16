@@ -18,7 +18,7 @@ def _send(callable_):
             return
         except Exception as e:
             tries += 1
-            if "retry after" in str(e).lower():
+            if "retry in" in str(e).lower():
                 wait = extract_wait_seconds(e) or delay
                 logging.warning("Flood control. Waiting %s s", wait)
                 time.sleep(wait)
