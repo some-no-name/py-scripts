@@ -17,22 +17,27 @@ from typing import List, Dict
 
 import pandas as pd
 
+from modules.folders_storage import clean_folders
+from modules.telegram_queue import TelegramQueue
 from notify_tools import notify
-from logger_utils import setup_logger
+from modules.logger import setup_logger
 from rfm_parser import fetch_rfm_list
 from storage import save_dataset, load_latest, save_report, update_master
 from compare import diff
 from airtable_client import AirtableClient
 from compare_airtable import compare_all_mapped, find_best_match, MatchType, match_quality, missed_regions
 from html_report import build_report
-from telegram_notify import send_message, send_document
 from config import (
     AIRTABLE_CACHE_DIR,
     AIRTABLE_TABLE_PERSECUTED,
     AIRTABLE_VIEW_MONITORING,
     AIRTABLE_FIELDS_MAIN,
     DATA_DIR,
+    KEEP_FILES_COUNT,
+    LOGS_DIR,
     REPORTS_DIR,
+    TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHANNEL_ID,
 )
 from utils import get_file_name
 
@@ -46,9 +51,18 @@ def run(*, test_mode: bool = False, compare_all: bool = False) -> None:
     """
     try:
         ts = datetime.now()
-        log_path: Path = setup_logger()
+        log_path: Path = setup_logger(LOGS_DIR)
         logging.info("=== RFM Parser started ===")
         logging.info("Log path: %s", log_path)
+
+        tq = TelegramQueue(TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, base_delay=1.0, max_tries=7)
+
+        clean_folders([
+            (AIRTABLE_CACHE_DIR, "*.csv"),
+            (LOGS_DIR, "*.log"),
+            (DATA_DIR, "*.csv"),
+            (REPORTS_DIR, "*.txt"),
+        ], keep_count=KEEP_FILES_COUNT)
 
         # 1. ── Парсим RFM ────────────────────────────────────────────────────
         df_new = fetch_rfm_list()
@@ -111,9 +125,9 @@ def run(*, test_mode: bool = False, compare_all: bool = False) -> None:
         if not compare_all:
             def _find_match(row, mode: str, index: int, count: int):
                 mtype, mrow, score = find_best_match(row, airtable_df)
-                logging.info(f"Best match {mode} ({index}/{count}): {mtype}({score})\nRFM: {row.get("Изначальный текст")}\nAIR: {mrow}")
+                logging.info(f"Best match {mode} ({index}/{count}): {mtype}({score})\nRFM: {row.get('Изначальный текст')}\nAIR: {mrow}")
                 if mtype != "none":
-                    notify(mode, row, mtype, score, mrow, report)
+                    notify(mode, row, mtype, score, mrow, report, tq=tq)
 
             index = 0
             for row in added_rfm:
@@ -137,14 +151,14 @@ def run(*, test_mode: bool = False, compare_all: bool = False) -> None:
         if compare_all:
             logging.info("Running FULL compare RFM ↔ Airtable …")
 
-            matches_all = compare_all_mapped(df_new, airtable_df, report)
+            matches_all = compare_all_mapped(df_new, airtable_df, report, tq=tq)
 
             logging.info("Full compare: %d matches", len(matches_all))
 
         if len(missed_regions) > 0:
             missed_regions_list = ', '.join(list(missed_regions))
             logging.warning(f"Missed regions list: [{missed_regions_list}]")
-            send_message(f"! В словаре регионов есть пропущенные ключи: [{missed_regions_list}]")
+            tq.send_message(f"! В словаре регионов есть пропущенные ключи: [{missed_regions_list}]")
 
         # 6. ── HTML-отчёт ────────────────────────────────────────────────────
         rfm_report_save = "\n----------\n".join(report)
@@ -166,9 +180,13 @@ def run(*, test_mode: bool = False, compare_all: bool = False) -> None:
         summary += f"+{len(added_rfm)} | -{len(removed_rfm)} | ~{len(changed_rfm)}"
 
         logging.info(f"Summary: {summary}")
-        send_message(summary)
-        send_document(str(file_new))
-        send_document(str(report_path))
+        tq.send_message(summary)
+        tq.send_document(str(file_new))
+        tq.send_document(str(report_path))
+
+        # Make sure we wait before the script exits:
+        tq.join()   # wait until the queue is empty
+        tq.close()  # stop worker thread cleanly
 
         logging.info("=== Finished ===")
 

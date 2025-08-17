@@ -17,21 +17,11 @@ def get_region_dict():
 
     return region_dict
 
-
-def _clean(folder: Path, ext: str):
-    files = sorted(folder.glob(ext), key=lambda p: p.stat().st_mtime, reverse=True)
-    for f in files[KEEP_FILES_COUNT:]:
-        try:
-            f.unlink()
-        except Exception as e:
-            logging.warning("Cannot delete %s: %s", f, e)
-
 def save_dataset(df: pd.DataFrame, ts: datetime) -> Path:
     DATA_DIR.mkdir(exist_ok=True, parents=True)
     path = DATA_DIR / f"data_{ts:%Y_%m_%d__%H_%M_%S}.csv"
     # comment for debug
     df.to_csv(path, index=False, encoding='utf-8')
-    _clean(DATA_DIR, "*.csv")
     return path
 
 def save_report(data: str, ts: datetime) -> Path:
@@ -39,10 +29,10 @@ def save_report(data: str, ts: datetime) -> Path:
     path = REPORTS_DIR / f"report_{ts:%Y_%m_%d__%H_%M_%S}.txt"
     with open(path, "w", encoding="utf-8") as f:
         f.write(data)
-    _clean(REPORTS_DIR, "*.txt")
     return path
 
-def load_latest(exclude: Path | None = None) -> pd.DataFrame | None:
+def load_latest(exclude: str = None):
+# def load_latest(exclude: Path | None = None) -> pd.DataFrame | None:
     files = sorted(DATA_DIR.glob("data_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
     for f in files:
         if exclude and f == exclude:

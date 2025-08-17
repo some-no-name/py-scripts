@@ -5,6 +5,7 @@ import logging, re, unicodedata, pandas as pd
 from rapidfuzz import fuzz, process
 from typing import Literal, Tuple, List, Dict
 
+from modules.telegram_queue import TelegramQueue
 from notify_tools import is_terrorist, notify
 from storage import get_region_dict
 
@@ -159,7 +160,8 @@ def normalize_and_compare_dobs(date1: str, date2: str) -> bool:
 def find_best_match(
     target_row: dict,
     airtable_df: pd.DataFrame,
-) -> Tuple[MatchType, Dict | None, int]:
+):
+# ) -> Tuple[MatchType, Dict | None, int]:
     """
     Для одной строки RFM ищем лучший вариант в Airtable.
     """
@@ -180,7 +182,7 @@ def find_best_match(
                 break
     return best_type, best_row, best_score
 
-def compare_all_mapped(df_new, airtable_df, report):
+def compare_all_mapped(df_new, airtable_df, report, tq: TelegramQueue):
     index = 0
     matches_all: List[Dict] = []
 
@@ -222,9 +224,9 @@ def compare_all_mapped(df_new, airtable_df, report):
 
         terr_match = ""
         if best_type != "none" and best_row:
-            notify("match_all", rfm_row, best_type, best_score, best_row, report)
+            notify("match_all", rfm_row, best_type, best_score, best_row, report, tq=tq)
         
-        logging.info(f"Best match all ({index}/{len(df_new)}) {terr_match}: {best_type}({best_score})\nRFM: {rfm_row.get("Изначальный текст")}\nAIR: {best_row}")
+        logging.info(f"Best match all ({index}/{len(df_new)}) {terr_match}: {best_type}({best_score})\nRFM: {rfm_row.get('Изначальный текст')}\nAIR: {best_row}")
         
 
     return matches_all
@@ -236,12 +238,12 @@ def compare_all_slow(df_new, airtable_df, report):
         index += 1
         rfm_row = rfm_row.to_dict()
         mtype, mrow, score = find_best_match(rfm_row, airtable_df)
-        logging.info(f"Best match all ({index}/{len(df_new)}): {mtype}({score})\nRFM: {rfm_row.get("Изначальный текст")}\nAIR: {mrow}")
+        logging.info(f"Best match all ({index}/{len(df_new)}): {mtype}({score})\nRFM: {rfm_row.get('Изначальный текст')}\nAIR: {mrow}")
         if mtype != "none" and mrow:
             rfm_terr = is_terrorist(rfm_row)
             air_terr = is_terrorist(mrow)
 
-            msg = f"#мэтч (сравнение всех) [{"T" if rfm_terr else "F"}{"T" if air_terr else "F"}]"
+            msg = f"#мэтч (сравнение всех) [{'T' if rfm_terr else 'F'}{'T' if air_terr else 'F'}]"
             msg += f"\n{rfm_row.get('Изначальный текст') or rfm_row.get('Имя')}"
             msg += f"\n\n{mrow}"
             report.append(msg)

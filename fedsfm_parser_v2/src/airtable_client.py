@@ -10,7 +10,6 @@ from config import (
     AIRTABLE_CACHE_DIR,
     AIRTABLE_FIELDS_MAIN,
 )
-from storage import _clean
 
 API_BASE = "https://api.airtable.com/v0"
 
@@ -45,9 +44,12 @@ class AirtableClient:
     def fetch_df(
         self,
         table: str,
-        view: str | None = None,
-        fields: List[str] | None = None,
-        cache_name: str | None = None,
+        view = None,
+        # view: str | None = None,
+        fields = None,
+        # fields: List[str] | None = None,
+        cache_name = None,
+        # cache_name: str | None = None,
     ) -> pd.DataFrame:
         """
         Загружает записи Airtable, возвращая **только нужные колонки**.
@@ -80,8 +82,6 @@ class AirtableClient:
 
         cache = AIRTABLE_CACHE_DIR / (cache_name or f"{table}.csv")
         df.to_csv(cache, index=False, encoding="utf-8")
-
-        _clean(AIRTABLE_CACHE_DIR, "*.csv")
         
         logging.info("Airtable: итог %d строк, %d колонок", len(df), len(df.columns) - 1)
         return df, cache

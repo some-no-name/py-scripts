@@ -5,6 +5,7 @@ __pycache__/
 python-script-key.pem
 
 data/
+data_copy/
 logs/
 reports/
 airtable_cache/

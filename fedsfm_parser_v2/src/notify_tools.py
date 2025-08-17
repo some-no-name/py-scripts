@@ -1,12 +1,20 @@
 
 import logging
 from typing import Dict
-from telegram_notify import send_message
+from modules.telegram_queue import TelegramQueue
 
 # mtype: MatchType
 
-
-def notify(action: str, rfm_row: Dict, mtype: str, score: int, air_row: dict, report, test_mode = False):
+def notify(
+        action: str,
+        rfm_row: Dict,
+        mtype: str,
+        score: int,
+        air_row: dict,
+        report,
+        tq: TelegramQueue,
+        test_mode = False,
+        ):
     logging.info(f"[Notify]: {action}, {mtype}, {score}, {rfm_row}")
     if test_mode:
         return  # не шумим
@@ -17,14 +25,14 @@ def notify(action: str, rfm_row: Dict, mtype: str, score: int, air_row: dict, re
     air_terrorist = is_terrorist(air_row)
 
     msg = f"{sym} {fio} ({dob}) — {action} [{mtype}, {score}];"
-    msg += f"\nAIR: {"✅" if air_terrorist else "❌"}; "
-    msg += f"RFM: {"✅" if rfm_terrorist else "❌"}"
-    msg += f"\nRFM:\n{str(rfm_row.get("Изначальный текст"))}"
+    msg += f"\nAIR: {'✅' if air_terrorist else '❌'}; "
+    msg += f"RFM: {'✅' if rfm_terrorist else '❌'}"
+    msg += f"\nRFM:\n{str(rfm_row.get('Изначальный текст'))}"
     msg += f"\n\nAIR:\n{_dict_to_string(air_row)}"
 
     report.append(msg)
 
-    send_message(msg)
+    tq.send_message(msg)
 
     # send_message(f"{sym} {fio} ({dob}) — {action} [{mtype}, {score}];\nRFM: {str(rfm_row.get("Изначальный текст"))}\n\nAIR:\n{_dict_to_string(mrow)}")
 
@@ -41,10 +49,8 @@ def is_terrorist(row: dict) -> bool:
     for fld in ["Террорист", "✦Росфинмониторинг"]:
         val = row.get(fld, None)
         if val != None and isinstance(val, str):
-            logging.info(f"return1 {val == 'True'}")
             return val == 'True'
         if val != None and isinstance(val, bool):
-            logging.info(f"return2 {val}")
             return val
 
     return False
